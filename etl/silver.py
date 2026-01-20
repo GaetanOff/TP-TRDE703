@@ -90,8 +90,8 @@ def transform(df: DataFrame) -> DataFrame:
     )
     
     # Cleanups
-    # 1. Fill brands nulls
-    transformed_df = transformed_df.withColumn("brand_name", coalesce(col("brand_name"), lit("Unknown")))
+    # 1. Fill brands nulls, normalize to lowercase and trim
+    transformed_df = transformed_df.withColumn("brand_name", lower(trim(coalesce(col("brand_name"), lit("unknown")))))
     
     # 2. Nutriscore uppercase
     transformed_df = transformed_df.withColumn("nutriscore_grade", when(col("nutriscore_grade").isin("a", "b", "c", "d", "e"), col("nutriscore_grade")).otherwise(None))

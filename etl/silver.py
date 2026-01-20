@@ -162,6 +162,11 @@ def transform(df: DataFrame) -> DataFrame:
     }
     COUNTRY_MAP.update(EXTRA_MAP)
     
+    # Add special country code mappings for aliases
+    COUNTRY_CODE_MAP['Russia'] = 'RU'
+    COUNTRY_CODE_MAP['Turkey'] = 'TR'
+    COUNTRY_CODE_MAP['World'] = 'WW'  # Special code for worldwide
+    
     @udf(returnType=StringType())
     def clean_country(s):
         if s is None:

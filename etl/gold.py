@@ -28,7 +28,7 @@ def load(df: DataFrame, db_url, db_user, db_password, db_driver):
     
     # 3. Dimension: Country
     print("Loading dim_country...")
-    countries = df.select("country_name").distinct().filter(col("country_name").isNotNull())
+    countries = df.select(col("country_name").alias("country_name_fr")).distinct().filter(col("country_name_fr").isNotNull())
     countries.coalesce(1).write.jdbc(url=db_url, table="dim_country", mode="append", properties=properties)
     
     # 4. Dimension: Time
@@ -52,8 +52,7 @@ def load(df: DataFrame, db_url, db_user, db_password, db_driver):
                        col("code"),
                        col("product_name"),
                        col("brand_sk"),
-                       col("category_sk").alias("primary_category_sk"),
-                       col("last_modified_t")
+                       col("category_sk").alias("primary_category_sk")
                    )
                    
     print("Loading dim_product...")

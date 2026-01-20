@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS dim_time (
     time_sk INT AUTO_INCREMENT PRIMARY KEY,
-    date DATE UNIQUE NOT NULL,
+    date DATE NOT NULL,
     year INT,
     month INT,
     day INT,

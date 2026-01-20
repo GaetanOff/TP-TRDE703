@@ -90,8 +90,19 @@ def transform(df: DataFrame) -> DataFrame:
     )
     
     # Cleanups
-    # 1. Fill brands nulls, normalize to lowercase and trim
-    transformed_df = transformed_df.withColumn("brand_name", lower(trim(coalesce(col("brand_name"), lit("unknown")))))
+    # 1. Fill brands nulls, normalize unicode, lowercase, trim, and truncate to 500 chars
+    from pyspark.sql.functions import substring, udf
+    from pyspark.sql.types import StringType
+    import unicodedata
+    
+    @udf(returnType=StringType())
+    def normalize_unicode(s):
+        if s is None:
+            return "unknown"
+        # NFC normalization to handle composed vs decomposed characters
+        return unicodedata.normalize('NFC', s.lower().strip())[:500]
+    
+    transformed_df = transformed_df.withColumn("brand_name", normalize_unicode(coalesce(col("brand_name"), lit("unknown"))))
     
     # 2. Nutriscore uppercase
     transformed_df = transformed_df.withColumn("nutriscore_grade", when(col("nutriscore_grade").isin("a", "b", "c", "d", "e"), col("nutriscore_grade")).otherwise(None))

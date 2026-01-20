@@ -1,5 +1,6 @@
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import col, when, coalesce, lit, current_timestamp, split, regexp_replace
+from pyspark.sql.functions import col, when, coalesce, lit, current_timestamp, split, regexp_replace, lower, trim
+
 
 def transform(df: DataFrame) -> DataFrame:
     """

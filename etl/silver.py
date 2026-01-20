@@ -105,10 +105,15 @@ def transform(df: DataFrame) -> DataFrame:
     # Use pycountry for comprehensive country lookup
     import pycountry
     
-    # Build a comprehensive mapping from all country names/codes to English name
+    # Build mappings: name -> standardized name, and name -> ISO code
     COUNTRY_MAP = {}
+    COUNTRY_CODE_MAP = {}  # Maps standardized country name to ISO alpha_2 code
+    
     for country in pycountry.countries:
         name_en = country.name
+        code = country.alpha_2
+        # Add to code map
+        COUNTRY_CODE_MAP[name_en] = code
         # Add official name
         COUNTRY_MAP[name_en.lower()] = name_en
         # Add alpha_2 code
@@ -185,8 +190,16 @@ def transform(df: DataFrame) -> DataFrame:
         first = ''.join(c for c in unicodedata.normalize('NFKD', first) if not unicodedata.combining(c))
         return first.strip().replace('-', ' ').title() if first else None
     
+    @udf(returnType=StringType())
+    def get_country_code(country_name):
+        """Get ISO alpha-2 code from standardized country name"""
+        if country_name is None:
+            return None
+        return COUNTRY_CODE_MAP.get(country_name, None)
+    
     transformed_df = transformed_df.withColumn("brand_name", normalize_unicode(coalesce(col("brand_name"), lit("unknown"))))
     transformed_df = transformed_df.withColumn("country_name", clean_country(col("country_name")))
+    transformed_df = transformed_df.withColumn("country_code", get_country_code(col("country_name")))
     transformed_df = transformed_df.withColumn("category_code", clean_category(col("category_code")))
     
     # 2. Nutriscore uppercase

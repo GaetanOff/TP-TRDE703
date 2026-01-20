@@ -30,7 +30,10 @@ def load(df: DataFrame, db_url, db_user, db_password, db_driver):
     
     # 3. Dimension: Country
     print("Loading dim_country...")
-    countries = df.select(col("country_name").alias("country_name_fr")).distinct().filter(col("country_name_fr").isNotNull())
+    countries = df.select(
+        col("country_code"),
+        col("country_name").alias("country_name_fr")
+    ).distinct().filter(col("country_name_fr").isNotNull())
     countries.coalesce(1).write.jdbc(url=db_url, table="dim_country", mode="append", properties=properties)
     
     # 4. Dimension: Time - Insert placeholder for today's date

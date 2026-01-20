@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: off_mysql_db
+    platform: linux/x86_64
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: off_datamart
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/ddl.sql:/docker-entrypoint-initdb.d/ddl.sql
+
+volumes:
+  mysql_data:

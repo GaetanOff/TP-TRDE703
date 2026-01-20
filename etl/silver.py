@@ -1,0 +1,109 @@
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import col, when, coalesce, lit, current_timestamp, split, regexp_replace
+
+def transform(df: DataFrame) -> DataFrame:
+    """
+    Transforms the Bronze dataframe to Silver.
+    - Selects relevant columns
+    - Casts types
+    - Cleans data
+    """
+    
+    # 1. Select relevant columns and rename if necessary
+    # Assuming columns exist in the CSV. In a real scenario, we'd check for existence.
+    cols_to_select = [
+        col("code"),
+        col("product_name").alias("product_name"),
+        col("brands").alias("brand_name"),
+        col("categories_tags").alias("category_code"), # Using tags as code often
+        col("countries_fr").alias("country_name"),
+        col("nutriscore_grade"),
+        col("nova_group"),
+        col("ecoscore_grade_fr").alias("ecoscore_grade"),
+        col("energy-kcal_100g").cast("float").alias("energy_kcal_100g"),
+        col("fat_100g").cast("float"),
+        col("saturated-fat_100g").cast("float").alias("saturated_fat_100g"),
+        col("sugars_100g").cast("float"),
+        col("salt_100g").cast("float"),
+        col("proteins_100g").cast("float"),
+        col("fiber_100g").cast("float"),
+        col("sodium_100g").cast("float"),
+        col("last_modified_t")
+    ]
+    
+    # Note: Column names in the CSV might vary (hyphens vs underscores).
+    # We might need to adjust based on actual CSV header.
+    # For now, we proceed with standard assumptions from OFF data.
+    
+    # Safe selection (ignoring missing columns could be an option, but for now we try to select)
+    # To make it robust, we should check df.columns
+    existing_cols = df.columns
+    selected_cols = []
+    
+    # Mapping for potential column names
+    mapping = {
+        "code": ["code"],
+        "product_name": ["product_name", "product_name_fr", "product_name_en"],
+        "brand_name": ["brands", "brands_tags"],
+        "category_code": ["categories_tags", "main_category_fr"],
+        "country_name": ["countries_fr", "countries", "countries_en"],
+        "nutriscore_grade": ["nutriscore_grade"],
+        "nova_group": ["nova_group"],
+        "ecoscore_grade": ["ecoscore_grade_fr", "ecoscore_grade"],
+        "energy_kcal_100g": ["energy-kcal_100g", "energy_100g"],
+        "fat_100g": ["fat_100g"],
+        "saturated_fat_100g": ["saturated-fat_100g"],
+        "sugars_100g": ["sugars_100g"],
+        "salt_100g": ["salt_100g"],
+        "proteins_100g": ["proteins_100g"],
+        "fiber_100g": ["fiber_100g"],
+        "sodium_100g": ["sodium_100g"],
+        "last_modified_t": ["last_modified_t"]
+    }
+    
+    # Helper to find first existing column from a list
+    def get_col(candidates, alias):
+        for c in candidates:
+            if c in existing_cols:
+                return col(c).alias(alias)
+        return lit(None).alias(alias)
+
+    transformed_df = df.select(
+        col("code"),
+        get_col(mapping["product_name"], "product_name"),
+        get_col(mapping["brand_name"], "brand_name"),
+        get_col(mapping["category_code"], "category_code"),
+        get_col(mapping["country_name"], "country_name"),
+        get_col(mapping["nutriscore_grade"], "nutriscore_grade"),
+        get_col(mapping["nova_group"], "nova_group"),
+        get_col(mapping["ecoscore_grade"], "ecoscore_grade"),
+        get_col(mapping["energy_kcal_100g"], "energy_kcal_100g").cast("float"),
+        get_col(mapping["fat_100g"], "fat_100g").cast("float"),
+        get_col(mapping["saturated_fat_100g"], "saturated_fat_100g").cast("float"),
+        get_col(mapping["sugars_100g"], "sugars_100g").cast("float"),
+        get_col(mapping["salt_100g"], "salt_100g").cast("float"),
+        get_col(mapping["proteins_100g"], "proteins_100g").cast("float"),
+        get_col(mapping["fiber_100g"], "fiber_100g").cast("float"),
+        get_col(mapping["sodium_100g"], "sodium_100g").cast("float"),
+        get_col(mapping["last_modified_t"], "last_modified_t")
+    )
+    
+    # Cleanups
+    # 1. Fill brands nulls
+    transformed_df = transformed_df.withColumn("brand_name", coalesce(col("brand_name"), lit("Unknown")))
+    
+    # 2. Nutriscore uppercase
+    transformed_df = transformed_df.withColumn("nutriscore_grade", when(col("nutriscore_grade").isin("a", "b", "c", "d", "e"), col("nutriscore_grade")).otherwise(None))
+    
+    # 3. Deduplicate by code taking the latest modification
+    # Window function to get latest
+    from pyspark.sql.window import Window
+    from pyspark.sql.functions import row_number
+    
+    windowSpec = Window.partitionBy("code").orderBy(col("last_modified_t").desc())
+    
+    deduped_df = transformed_df.withColumn("rn", row_number().over(windowSpec)) \
+        .filter(col("rn") == 1) \
+        .drop("rn")
+        
+    return deduped_df

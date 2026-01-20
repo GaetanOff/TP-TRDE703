@@ -31,9 +31,14 @@ def load(df: DataFrame, db_url, db_user, db_password, db_driver):
     countries = df.select(col("country_name").alias("country_name_fr")).distinct().filter(col("country_name_fr").isNotNull())
     countries.coalesce(1).write.jdbc(url=db_url, table="dim_country", mode="append", properties=properties)
     
-    # 4. Dimension: Time
-    # Check max date or create a date range. For snapshot, current date is relevant?
-    # Or use last_modified_t to generate time dimension entries.
+    # 4. Dimension: Time - Insert placeholder for today's date
+    print("Loading dim_time...")
+    spark = df.sparkSession
+    from datetime import date
+    today = date.today()
+    time_df = spark.createDataFrame([(today, today.year, today.month, today.day, today.isocalendar()[1], today.isocalendar()[1])], 
+                                     ["date", "year", "month", "day", "week", "iso_week"])
+    time_df.coalesce(1).write.jdbc(url=db_url, table="dim_time", mode="append", properties=properties)
     
     # 5. Dimension: Product
     # Needs to lookup foreign keys from dims.

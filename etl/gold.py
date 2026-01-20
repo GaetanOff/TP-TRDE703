@@ -18,20 +18,18 @@ def load(df: DataFrame, db_url, db_user, db_password, db_driver):
     # 1. Dimension: Brand
     print("Loading dim_brand...")
     brands = df.select("brand_name").distinct().filter(col("brand_name").isNotNull())
-    # In a real pipeline, we would read existing brands and only insert new ones.
-    # For this TP, we assume truncate-insert or use IGNORE
-    brands.write.jdbc(url=db_url, table="dim_brand", mode="append", properties=properties) 
+    # Coalesce to 1 partition to avoid deadlocks from concurrent writes
+    brands.coalesce(1).write.jdbc(url=db_url, table="dim_brand", mode="append", properties=properties) 
     
     # 2. Dimension: Category
-    # Simplified handling: taking unique category codes
     print("Loading dim_category...")
     categories = df.select("category_code").distinct().filter(col("category_code").isNotNull())
-    categories.write.jdbc(url=db_url, table="dim_category", mode="append", properties=properties)
+    categories.coalesce(1).write.jdbc(url=db_url, table="dim_category", mode="append", properties=properties)
     
     # 3. Dimension: Country
     print("Loading dim_country...")
     countries = df.select("country_name").distinct().filter(col("country_name").isNotNull())
-    countries.write.jdbc(url=db_url, table="dim_country", mode="append", properties=properties)
+    countries.coalesce(1).write.jdbc(url=db_url, table="dim_country", mode="append", properties=properties)
     
     # 4. Dimension: Time
     # Check max date or create a date range. For snapshot, current date is relevant?
@@ -59,7 +57,7 @@ def load(df: DataFrame, db_url, db_user, db_password, db_driver):
                    )
                    
     print("Loading dim_product...")
-    product_df.write.jdbc(url=db_url, table="dim_product", mode="append", properties=properties)
+    product_df.coalesce(1).write.jdbc(url=db_url, table="dim_product", mode="append", properties=properties)
     
     # 6. Fact
     # Re-join product to get product_sk
@@ -80,4 +78,4 @@ def load(df: DataFrame, db_url, db_user, db_password, db_driver):
                 )
     
     print("Loading fact_nutrition_snapshot...")
-    fact_df.write.jdbc(url=db_url, table="fact_nutrition_snapshot", mode="append", properties=properties)
+    fact_df.coalesce(1).write.jdbc(url=db_url, table="fact_nutrition_snapshot", mode="append", properties=properties)

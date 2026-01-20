@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS dim_country (
 CREATE TABLE IF NOT EXISTS dim_product (
     product_sk INT AUTO_INCREMENT PRIMARY KEY,
     code VARCHAR(50) NOT NULL, -- EAN-13 or other barcode
-    product_name VARCHAR(2048),
+    product_name TEXT,
     brand_sk INT,
     primary_category_sk INT,
     effective_from TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

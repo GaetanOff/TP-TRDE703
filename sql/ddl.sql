@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS dim_brand (
 
 CREATE TABLE IF NOT EXISTS dim_category (
     category_sk INT AUTO_INCREMENT PRIMARY KEY,
-    category_code VARCHAR(255) UNIQUE NOT NULL,
-    category_name_fr VARCHAR(512),
+    category_code TEXT NOT NULL,
+    category_name_fr TEXT,
     level INT,
     parent_category_sk INT,
     FOREIGN KEY (parent_category_sk) REFERENCES dim_category(category_sk)
@@ -29,8 +29,8 @@ CREATE TABLE IF NOT EXISTS dim_category (
 
 CREATE TABLE IF NOT EXISTS dim_country (
     country_sk INT AUTO_INCREMENT PRIMARY KEY,
-    country_code VARCHAR(10) UNIQUE,
-    country_name_fr VARCHAR(255)
+    country_code VARCHAR(10),
+    country_name_fr TEXT
 );
 
 CREATE TABLE IF NOT EXISTS dim_product (

@@ -1,3 +1,4 @@
 pyspark==3.5.8
 mysql-connector-python==9.5.0
 pytest==9.0.2
+pycountry==24.6.1

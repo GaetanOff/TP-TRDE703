@@ -102,6 +102,61 @@ def transform(df: DataFrame) -> DataFrame:
         # NFC normalization to handle composed vs decomposed characters
         return unicodedata.normalize('NFC', s.lower().strip())[:500]
     
+    # Use pycountry for comprehensive country lookup
+    import pycountry
+    
+    # Build a comprehensive mapping from all country names/codes to English name
+    COUNTRY_MAP = {}
+    for country in pycountry.countries:
+        name_en = country.name
+        # Add official name
+        COUNTRY_MAP[name_en.lower()] = name_en
+        # Add alpha_2 code
+        COUNTRY_MAP[country.alpha_2.lower()] = name_en
+        # Add alpha_3 code
+        COUNTRY_MAP[country.alpha_3.lower()] = name_en
+        # Add common name if exists
+        if hasattr(country, 'common_name'):
+            COUNTRY_MAP[country.common_name.lower()] = name_en
+        # Add official name if exists
+        if hasattr(country, 'official_name'):
+            COUNTRY_MAP[country.official_name.lower()] = name_en
+    
+    # Add extra common variations not covered by pycountry
+    EXTRA_MAP = {
+        'royaume-uni': 'United Kingdom', 'angleterre': 'United Kingdom', 'england': 'United Kingdom',
+        'etats-unis': 'United States', 'amerika': 'United States', 'usa': 'United States',
+        'allemagne': 'Germany', 'alemania': 'Germany', 'niemcy': 'Germany', 'duitsland': 'Germany',
+        'espagne': 'Spain', 'spanien': 'Spain', 'spagna': 'Spain',
+        'italie': 'Italy', 'italien': 'Italy',
+        'belgique': 'Belgium', 'belgie': 'Belgium', 'belgien': 'Belgium',
+        'pays-bas': 'Netherlands', 'holland': 'Netherlands', 'nederland': 'Netherlands',
+        'suisse': 'Switzerland', 'schweiz': 'Switzerland', 'svizzera': 'Switzerland',
+        'autriche': 'Austria', 'osterreich': 'Austria', 'oostenrijk': 'Austria',
+        'pologne': 'Poland', 'polska': 'Poland', 'polen': 'Poland',
+        'suede': 'Sweden', 'schweden': 'Sweden', 'sverige': 'Sweden',
+        'norvege': 'Norway', 'norwegen': 'Norway', 'norge': 'Norway',
+        'danemark': 'Denmark', 'danmark': 'Denmark',
+        'finlande': 'Finland', 'finnland': 'Finland', 'suomi': 'Finland',
+        'irlande': 'Ireland', 'irland': 'Ireland',
+        'grece': 'Greece', 'griechenland': 'Greece', 'grecia': 'Greece',
+        'roumanie': 'Romania', 'rumanien': 'Romania',
+        'hongrie': 'Hungary', 'ungarn': 'Hungary',
+        'republique tcheque': 'Czechia', 'tschechien': 'Czechia',
+        'maroc': 'Morocco', 'marokko': 'Morocco',
+        'tunisie': 'Tunisia', 'tunesien': 'Tunisia',
+        'algerie': 'Algeria', 'algerien': 'Algeria',
+        'afrique du sud': 'South Africa', 'sudafrika': 'South Africa',
+        'turquie': 'Turkey', 'turkei': 'Turkey',
+        'bresil': 'Brazil', 'brasilien': 'Brazil',
+        'mexique': 'Mexico', 'mexiko': 'Mexico',
+        'chine': 'China', 'japon': 'Japan', 'inde': 'India', 'indien': 'India',
+        'russie': 'Russia', 'russland': 'Russia',
+        'australie': 'Australia', 'australien': 'Australia',
+        'world': 'World', 'monde': 'World', 'worldwide': 'World', 'welt': 'World',
+    }
+    COUNTRY_MAP.update(EXTRA_MAP)
+    
     @udf(returnType=StringType())
     def clean_country(s):
         if s is None:
@@ -111,9 +166,11 @@ def transform(df: DataFrame) -> DataFrame:
         # Remove language prefix like "en:", "fr:", etc.
         if ':' in first:
             first = first.split(':')[-1]
-        # Remove accents (România -> Romania)
+        # Remove accents and normalize
         first = ''.join(c for c in unicodedata.normalize('NFKD', first) if not unicodedata.combining(c))
-        return first.strip().title() if first else None
+        first = first.strip().lower().replace('-', ' ')
+        # Map to standardized name, return None if not recognized
+        return COUNTRY_MAP.get(first, None)
     
     @udf(returnType=StringType())
     def clean_category(s):

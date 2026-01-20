@@ -1,67 +1,127 @@
 -- Analytical Queries for OpenFoodFacts Datamart
+-- Note: These queries work with the current schema where nutrition values 
+-- are stored directly in fact_nutrition_snapshot
 
--- 1. Top 10 brands by proportion of Nutri-Score A/B
+-- 1. Top 10 brands by number of products
 SELECT 
     b.brand_name,
-    COUNT(CASE WHEN n.nutriscore_grade IN ('a', 'b') THEN 1 END) * 100.0 / COUNT(*) as prop_ab
-FROM fact_nutrition_snapshot f
-JOIN dim_product p ON f.product_sk = p.product_sk
+    COUNT(*) as product_count
+FROM dim_product p
 JOIN dim_brand b ON p.brand_sk = b.brand_sk
-JOIN dim_nutri n ON f.nutri_sk = n.nutri_sk
 GROUP BY b.brand_name
 HAVING COUNT(*) > 50
-ORDER BY prop_ab DESC
+ORDER BY product_count DESC
 LIMIT 10;
 
--- 2. Nutri-Score distribution by Category Level 2
--- Assuming hierarchy allows identifying level 2. 
--- For simplicity, using category name.
-SELECT 
-    c.category_name_fr,
-    n.nutriscore_grade,
-    COUNT(*) as product_count
-FROM fact_nutrition_snapshot f
-JOIN dim_product p ON f.product_sk = p.product_sk
-JOIN dim_category c ON p.primary_category_sk = c.category_sk
-JOIN dim_nutri n ON f.nutri_sk = n.nutri_sk
-WHERE c.level = 2
-GROUP BY c.category_name_fr, n.nutriscore_grade
-ORDER BY c.category_name_fr, n.nutriscore_grade;
-
--- 3. Heatmap: Country x Category -> Avg Sugars
-SELECT 
-    co.country_name_fr,
-    c.category_name_fr,
-    AVG(f.sugars_100g) as avg_sugar
-FROM fact_nutrition_snapshot f
-JOIN dim_product p ON f.product_sk = p.product_sk
-JOIN dim_category c ON p.primary_category_sk = c.category_sk
--- Note: Product can have multiple countries. dim_product usually links to one. 
--- If many-to-many, need bridge. Assuming single primary country here or flattened.
-JOIN dim_country co ON p.product_sk = co.product_sk -- Hypothetical join if country linked to product directly or via many-to-many
--- Adjusted to current schema:
--- In Gold.py we didn't explicitly link product to country FK. 
--- Let's assume we add country_sk to dim_product or bridge.
--- For now, commenting out the join requiring schema adjustment.
-GROUP BY co.country_name_fr, c.category_name_fr;
-
--- 4. Completeness rate by Brand
+-- 2. Average nutritional values by brand (Top brands)
 SELECT 
     b.brand_name,
-    AVG(f.completeness_score) as avg_completeness
+    COUNT(*) as product_count,
+    ROUND(AVG(f.energy_kcal_100g), 2) as avg_energy,
+    ROUND(AVG(f.fat_100g), 2) as avg_fat,
+    ROUND(AVG(f.sugars_100g), 2) as avg_sugars,
+    ROUND(AVG(f.proteins_100g), 2) as avg_proteins
 FROM fact_nutrition_snapshot f
 JOIN dim_product p ON f.product_sk = p.product_sk
 JOIN dim_brand b ON p.brand_sk = b.brand_sk
+WHERE f.energy_kcal_100g IS NOT NULL
 GROUP BY b.brand_name
-ORDER BY avg_completeness DESC;
+HAVING COUNT(*) > 100
+ORDER BY product_count DESC
+LIMIT 20;
 
--- 5. Anomalies List (e.g., sugars > 100)
+-- 3. Product distribution by category
+SELECT 
+    c.category_code,
+    COUNT(*) as product_count
+FROM dim_product p
+JOIN dim_category c ON p.primary_category_sk = c.category_sk
+GROUP BY c.category_code
+ORDER BY product_count DESC
+LIMIT 20;
+
+-- 4. Average sugars by category (Top categories by product count)
+SELECT 
+    c.category_code,
+    COUNT(*) as product_count,
+    ROUND(AVG(f.sugars_100g), 2) as avg_sugars_100g,
+    ROUND(AVG(f.salt_100g), 2) as avg_salt_100g
+FROM fact_nutrition_snapshot f
+JOIN dim_product p ON f.product_sk = p.product_sk
+JOIN dim_category c ON p.primary_category_sk = c.category_sk
+WHERE f.sugars_100g IS NOT NULL
+GROUP BY c.category_code
+HAVING COUNT(*) > 50
+ORDER BY avg_sugars_100g DESC
+LIMIT 20;
+
+-- 5. Anomalies List (e.g., sugars > 100, excessive energy values)
 SELECT 
     p.code,
     p.product_name,
-    f.sugars_100g
+    f.energy_kcal_100g,
+    f.sugars_100g,
+    f.salt_100g
 FROM fact_nutrition_snapshot f
 JOIN dim_product p ON f.product_sk = p.product_sk
 WHERE f.sugars_100g > 100 
    OR f.salt_100g > 100
-   OR f.energy_kcal_100g > 900; -- fat is 9kcal/g, so 900 max pure fat
+   OR f.energy_kcal_100g > 900
+LIMIT 50;
+
+-- 6. Country distribution (products by country)
+SELECT 
+    country_name_fr,
+    COUNT(*) as appearance_count
+FROM dim_country
+WHERE country_name_fr IS NOT NULL
+GROUP BY country_name_fr
+ORDER BY appearance_count DESC
+LIMIT 20;
+
+-- 7. Products with highest fat content
+SELECT 
+    p.code,
+    p.product_name,
+    b.brand_name,
+    f.fat_100g,
+    f.saturated_fat_100g
+FROM fact_nutrition_snapshot f
+JOIN dim_product p ON f.product_sk = p.product_sk
+LEFT JOIN dim_brand b ON p.brand_sk = b.brand_sk
+WHERE f.fat_100g IS NOT NULL
+ORDER BY f.fat_100g DESC
+LIMIT 20;
+
+-- 8. Products with highest protein content (healthy options)
+SELECT 
+    p.code,
+    p.product_name,
+    b.brand_name,
+    f.proteins_100g,
+    f.energy_kcal_100g
+FROM fact_nutrition_snapshot f
+JOIN dim_product p ON f.product_sk = p.product_sk
+LEFT JOIN dim_brand b ON p.brand_sk = b.brand_sk
+WHERE f.proteins_100g IS NOT NULL
+ORDER BY f.proteins_100g DESC
+LIMIT 20;
+
+-- 9. Summary statistics
+SELECT 
+    COUNT(*) as total_facts,
+    COUNT(energy_kcal_100g) as with_energy,
+    COUNT(sugars_100g) as with_sugars,
+    COUNT(proteins_100g) as with_proteins,
+    ROUND(AVG(energy_kcal_100g), 2) as avg_energy,
+    ROUND(AVG(sugars_100g), 2) as avg_sugars,
+    ROUND(AVG(proteins_100g), 2) as avg_proteins
+FROM fact_nutrition_snapshot;
+
+-- 10. Brand overview with all dimensions
+SELECT 
+    (SELECT COUNT(*) FROM dim_brand) as total_brands,
+    (SELECT COUNT(*) FROM dim_category) as total_categories,
+    (SELECT COUNT(*) FROM dim_country) as total_countries,
+    (SELECT COUNT(*) FROM dim_product) as total_products,
+    (SELECT COUNT(*) FROM fact_nutrition_snapshot) as total_facts;

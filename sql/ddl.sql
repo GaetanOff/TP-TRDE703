@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS dim_time (
 
 CREATE TABLE IF NOT EXISTS dim_brand (
     brand_sk INT AUTO_INCREMENT PRIMARY KEY,
-    brand_name VARCHAR(500) UNIQUE NOT NULL
+    brand_name VARCHAR(500) NOT NULL,
+    INDEX idx_brand_name (brand_name(255))
 );
 
 CREATE TABLE IF NOT EXISTS dim_category (

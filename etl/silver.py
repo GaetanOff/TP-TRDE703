@@ -91,7 +91,7 @@ def transform(df: DataFrame) -> DataFrame:
     
     # Cleanups
     # 1. Fill brands nulls, normalize unicode, lowercase, trim, and truncate to 500 chars
-    from pyspark.sql.functions import substring, udf
+    from pyspark.sql.functions import substring, udf, split, regexp_replace
     from pyspark.sql.types import StringType
     import unicodedata
     
@@ -102,7 +102,35 @@ def transform(df: DataFrame) -> DataFrame:
         # NFC normalization to handle composed vs decomposed characters
         return unicodedata.normalize('NFC', s.lower().strip())[:500]
     
+    @udf(returnType=StringType())
+    def clean_country(s):
+        if s is None:
+            return None
+        # Take first country from comma-separated list
+        first = s.split(',')[0].strip()
+        # Remove language prefix like "en:", "fr:", etc.
+        if ':' in first:
+            first = first.split(':')[-1]
+        # Remove accents (România -> Romania)
+        first = ''.join(c for c in unicodedata.normalize('NFKD', first) if not unicodedata.combining(c))
+        return first.strip().title() if first else None
+    
+    @udf(returnType=StringType())
+    def clean_category(s):
+        if s is None:
+            return None
+        # Take first category from comma-separated list
+        first = s.split(',')[0].strip()
+        # Remove language prefix
+        if ':' in first:
+            first = first.split(':')[-1]
+        # Remove accents and clean up
+        first = ''.join(c for c in unicodedata.normalize('NFKD', first) if not unicodedata.combining(c))
+        return first.strip().replace('-', ' ').title() if first else None
+    
     transformed_df = transformed_df.withColumn("brand_name", normalize_unicode(coalesce(col("brand_name"), lit("unknown"))))
+    transformed_df = transformed_df.withColumn("country_name", clean_country(col("country_name")))
+    transformed_df = transformed_df.withColumn("category_code", clean_category(col("category_code")))
     
     # 2. Nutriscore uppercase
     transformed_df = transformed_df.withColumn("nutriscore_grade", when(col("nutriscore_grade").isin("a", "b", "c", "d", "e"), col("nutriscore_grade")).otherwise(None))

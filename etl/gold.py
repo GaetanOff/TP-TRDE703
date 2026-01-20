@@ -8,11 +8,13 @@ def load(df: DataFrame, db_url, db_user, db_password, db_driver):
     - Populates Fact Table
     """
     
-    # JDBC Properties
+    # JDBC Properties with batch optimization
     properties = {
         "user": db_user,
         "password": db_password,
-        "driver": db_driver
+        "driver": db_driver,
+        "batchsize": "10000",  # Insert 10k rows per batch instead of default
+        "rewriteBatchedStatements": "true"  # MySQL optimization for batch inserts
     }
     
     # 1. Dimension: Brand

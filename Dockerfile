@@ -1,4 +1,4 @@
-FROM openjdk:11-jdk-slim
+FROM eclipse-temurin:11-jdk
 
 # Install Python
 RUN apt-get update && apt-get install -y \
@@ -14,7 +14,6 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY etl/ ./etl/
-COPY en.openfoodfacts.org.products.csv ./
 
 # Run ETL pipeline
 CMD ["python3", "-m", "etl.main"]

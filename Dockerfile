@@ -1,4 +1,4 @@
-FROM eclipse-temurin:11-jdk
+FROM eclipse-temurin:21-jdk
 
 # Install Python and create venv
 RUN apt-get update && apt-get install -y \

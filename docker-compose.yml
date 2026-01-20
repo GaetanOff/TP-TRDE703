@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
@@ -13,6 +11,26 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./sql/ddl.sql:/docker-entrypoint-initdb.d/ddl.sql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-ppassword" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  etl:
+    build: .
+    container_name: off_etl
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./en.openfoodfacts.org.products.csv:/app/en.openfoodfacts.org.products.csv:ro
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=off_datamart
+      - DB_USER=root
+      - DB_PASSWORD=password
 
 volumes:
   mysql_data:

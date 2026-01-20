@@ -107,15 +107,32 @@ def transform(df: DataFrame) -> DataFrame:
     # 2. Nutriscore uppercase
     transformed_df = transformed_df.withColumn("nutriscore_grade", when(col("nutriscore_grade").isin("a", "b", "c", "d", "e"), col("nutriscore_grade")).otherwise(None))
     
-    # 3. Replace Infinity and NaN values with NULL in numeric columns
-    from pyspark.sql.functions import isnan, isnull
-    numeric_cols = ["energy_kcal_100g", "fat_100g", "saturated_fat_100g", "sugars_100g", 
-                    "salt_100g", "proteins_100g", "fiber_100g", "sodium_100g"]
-    for nc in numeric_cols:
+    # 3. Data Quality: Replace Infinity, NaN, and out-of-bounds values with NULL
+    # Nutritional values per 100g cannot exceed 100g, energy cannot exceed ~900 kcal (pure fat)
+    from pyspark.sql.functions import isnan
+    
+    # Define valid bounds for each column (min, max)
+    bounds = {
+        "energy_kcal_100g": (0, 900),      # Max ~900 kcal for pure fat
+        "fat_100g": (0, 100),              # Max 100g per 100g
+        "saturated_fat_100g": (0, 100),    # Max 100g per 100g
+        "sugars_100g": (0, 100),           # Max 100g per 100g
+        "salt_100g": (0, 100),             # Max 100g per 100g
+        "proteins_100g": (0, 100),         # Max 100g per 100g
+        "fiber_100g": (0, 100),            # Max 100g per 100g
+        "sodium_100g": (0, 40),            # Max ~40g (very salty)
+    }
+    
+    for nc, (min_val, max_val) in bounds.items():
         transformed_df = transformed_df.withColumn(
             nc, 
-            when((col(nc).isNull()) | isnan(col(nc)) | (col(nc) == float('inf')) | (col(nc) == float('-inf')), None)
-            .otherwise(col(nc))
+            when(
+                (col(nc).isNull()) | 
+                isnan(col(nc)) | 
+                (col(nc) < min_val) | 
+                (col(nc) > max_val),
+                None
+            ).otherwise(col(nc))
         )
     
     # 3. Deduplicate by code taking the latest modification

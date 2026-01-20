@@ -107,6 +107,17 @@ def transform(df: DataFrame) -> DataFrame:
     # 2. Nutriscore uppercase
     transformed_df = transformed_df.withColumn("nutriscore_grade", when(col("nutriscore_grade").isin("a", "b", "c", "d", "e"), col("nutriscore_grade")).otherwise(None))
     
+    # 3. Replace Infinity and NaN values with NULL in numeric columns
+    from pyspark.sql.functions import isnan, isnull
+    numeric_cols = ["energy_kcal_100g", "fat_100g", "saturated_fat_100g", "sugars_100g", 
+                    "salt_100g", "proteins_100g", "fiber_100g", "sodium_100g"]
+    for nc in numeric_cols:
+        transformed_df = transformed_df.withColumn(
+            nc, 
+            when((col(nc).isNull()) | isnan(col(nc)) | (col(nc) == float('inf')) | (col(nc) == float('-inf')), None)
+            .otherwise(col(nc))
+        )
+    
     # 3. Deduplicate by code taking the latest modification
     # Window function to get latest
     from pyspark.sql.window import Window

@@ -43,9 +43,9 @@ This project implements an ETL pipeline using Apache Spark (PySpark) to process 
 
 ## Running the ETL
 
-Execute the main ETL script:
+Execute the main ETL script as a module:
 ```bash
-python3 etl/main.py
+python3 -m etl.main
 ```
 
 ## Running Tests
